@@ -1,0 +1,28 @@
+{
+  "server": {
+    "httpPort": 3000,
+    "httpsPort": 3443,
+    "certFile": "./certs/cert.pem",
+    "keyFile": "./certs/key.pem"
+  },
+  "openclaw": {
+    "apiUrl": "https://127.0.0.1:18789/v1/chat/completions",
+    "apiKey": "openclaw gateway.auth.token"
+  },
+  "jwtSecret": "openclaw-webchat-jwt-secret-2024",
+  "agents": [
+    {
+      "id": "main",
+      "name": "🤖 管家",
+      "description": "智能生活助理"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "password": "admin123",
+      "allowedAgents": ["main"],
+      "isAdmin": true
+    }
+  ]
+}

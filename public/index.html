@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🤖 OpenClaw 聊天</title>
+  <script src="marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html {
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary: #8b5cf6;
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-light: #64748b;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    
+    /* ===== 登录页面 ===== */
+    .auth-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .auth-box {
+      background: var(--surface);
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 400px;
+      max-width: 90%;
+    }
+    
+    .auth-box h1 { text-align: center; margin-bottom: 30px; font-size: 1.5rem; }
+    .auth-box h1 span { font-size: 2rem; }
+    
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-light); }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { outline: none; border-color: var(--primary); }
+    
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    
+    .error-msg {
+      background: #fef2f2;
+      color: var(--error);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+      text-align: center;
+    }
+    
+    /* ===== 主界面 ===== */
+    .app-container {
+      display: none;
+      height: 100vh;
+    }
+    .app-container.active { display: flex; }
+    
+    /* PC版布局 */
+    .sidebar {
+      width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header h2 { font-size: 1.25rem; margin-bottom: 15px; }
+    
+    .agent-list { flex: 1; overflow-y: auto; padding: 10px; }
+    
+    .agent-item {
+      padding: 15px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+    .agent-item:hover { background: var(--bg); }
+    .agent-item.active {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+    }
+    .agent-item .name { font-weight: 600; margin-bottom: 4px; }
+    .agent-item .desc { font-size: 0.85rem; opacity: 0.7; }
+    
+    .temp-session-item {
+      padding: 10px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 4px;
+      margin-left: 20px;
+      background: #f8fafc;
+      border: 2px solid #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .temp-session-item:hover { background: #f1f5f9; border-color: #94a3b8; }
+    .temp-session-item.active {
+      background: linear-gradient(135deg, #f97316, #fb923c);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    }
+    .temp-session-item .temp-name { font-size: 0.9rem; font-weight: 500; color: #334155; }
+    .temp-session-item.active .temp-name { color: white; }
+    .temp-session-item .temp-delete {
+      opacity: 0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+      font-size: 0.75rem;
+    }
+    .temp-session-item:hover .temp-delete { opacity: 1; }
+    .temp-session-item.active .temp-delete { color: white; background: rgba(255,255,255,0.2); }
+    
+    .agent-expand-btn {
+      float: right;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    .agent-expand-btn:hover { background: var(--bg); }
+    
+    .sidebar-footer {
+      padding: 15px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .sidebar-footer .btn-sm {
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      flex: 1;
+    }
+    .sidebar-footer .btn-sm:hover { background: var(--bg); }
+    .sidebar-footer .btn-sm.danger { color: var(--error); border-color: var(--error); }
+    
+    .user-info {
+      padding: 15px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .user-info span { color: var(--text-light); }
+    .logout-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    .logout-btn:hover { background: var(--bg); }
+    
+    /* 主聊天区 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    
+    .chat-header {
+      padding: 15px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chat-header .agent-name { font-weight: 600; }
+    
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .message {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      line-height: 1.5;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .message .content { white-space: pre-wrap; }
+    .message.assistant .content { white-space: normal; }
+    .message pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    .message code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .message pre code { background: transparent; }
+    
+    .message .time {
+      font-size: 0.75rem;
+      opacity: 0.5;
+      margin-top: 6px;
+    }
+    
+    .message .file-info {
+      background: rgba(0,0,0,0.1);
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .message .file-info a { color: inherit; text-decoration: underline; }
+    
+    .input-area {
+      padding: 15px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    
+    .input-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .selected-file {
+      display: none;
+      padding: 8px 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      align-items: center;
+      gap: 8px;
+    }
+    .selected-file.active { display: flex; }
+    .selected-file .remove { color: var(--error); cursor: pointer; }
+    
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 1rem;
+      resize: none;
+      min-height: 44px;
+      max-height: 150px;
+      font-family: inherit;
+    }
+    textarea:focus { outline: none; border-color: var(--primary); }
+    textarea:disabled { background: var(--bg); cursor: not-allowed; }
+    
+    .action-btns {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      transition: all 0.2s;
+    }
+    .icon-btn:hover { background: var(--bg); border-color: var(--primary); }
+    .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .icon-btn.send {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      border: none;
+    }
+    .icon-btn.send:hover { transform: scale(1.05); }
+    
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-light);
+    }
+    .empty-state .icon { font-size: 4rem; margin-bottom: 20px; }
+    
+    /* ===== 手机版 ===== */
+    .mobile-header {
+      display: none;
+      padding: 12px 15px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .mobile-header .menu-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 1.5rem;
+    }
+    .mobile-header .current-agent { font-weight: 600; }
+    .mobile-header .logout-btn { padding: 6px 10px; font-size: 0.85rem; }
+    
+    /* 手机侧边菜单 */
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      height: 100%;
+      background: var(--surface);
+      z-index: 200;
+      transform: translateX(-100%);
+      transition: transform 0.3s;
+      flex-direction: column;
+    }
+    .mobile-menu.active { transform: translateX(0); }
+    .mobile-menu.right-menu { left: auto; right: 0; transform: translateX(100%); }
+    .mobile-menu.right-menu.active { transform: translateX(0); }
+    
+    .mobile-menu-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 150;
+    }
+    .mobile-menu-overlay.active { display: block; }
+    
+    .mobile-menu-header {
+      padding: 15px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mobile-menu-header h3 { font-size: 1.1rem; }
+    .mobile-menu-header .close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    
+    .mobile-menu .agent-list { flex: 1; overflow-y: auto; padding: 10px; }
+    
+    .mobile-menu-footer {
+      padding: 15px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .mobile-menu-footer .btn-sm { flex: 1; }
+    
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .app-container { flex-direction: column; height: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+      .sidebar { display: none; }
+      .mobile-header { display: flex; flex-shrink: 0; }
+      .mobile-menu { display: flex; }
+      .mobile-menu.right-menu { display: flex; }
+      .message { max-width: 90%; }
+      .chat-header { display: none; }
+      .main-content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+      .messages-container { flex: 1; overflow-y: auto; padding: 15px; min-height: 0; -webkit-overflow-scrolling: touch; }
+      .input-area { flex-shrink: 0; padding: 10px 15px; background: var(--surface); border-top: 1px solid var(--border); }
+      .input-wrapper { width: 100%; }
+      .action-btns { flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 登录页面 -->
+<div class="auth-container" id="authContainer">
+  <div class="auth-box">
+    <h1><span>🤖</span> OpenClaw 聊天</h1>
+    <div class="error-msg" id="authError"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="loginUsername" placeholder="输入用户名" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="loginPassword" placeholder="输入密码" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginBtn">登录</button>
+    </form>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div class="app-container" id="appContainer">
+  <!-- PC侧边栏 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>🤖 选择 Agent</h2>
+    </div>
+    <div class="agent-list" id="agentList"></div>
+    <div class="sidebar-footer">
+    </div>
+    <div class="user-info">
+      <span id="displayUsername"></span>
+      <button class="logout-btn" id="logoutBtn">退出</button>
+    </div>
+  </div>
+  
+  <!-- 手机顶部 -->
+  <div class="mobile-header">
+    <button class="menu-btn" id="menuBtn">☰</button>
+    <span class="current-agent" id="mobileAgentName">选择 Agent</span>
+    <button class="menu-btn" id="rightMenuBtn">☰</button>
+  </div>
+  
+  <!-- 手机左侧菜单（Agent选择） -->
+  <div class="mobile-menu-overlay" id="menuOverlay"></div>
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-user-info" style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <span id="mobileDisplayUsername"></span>
+      <button class="logout-btn" id="mobileLogoutBtn">退出</button>
+    </div>
+    <div class="mobile-menu-header">
+      <h3>选择 Agent</h3>
+      <button class="close-btn" id="closeMenuBtn">✕</button>
+    </div>
+    <div class="agent-list" id="mobileAgentList"></div>
+  </div>
+  
+  <!-- 手机右侧菜单（操作菜单） -->
+  <div class="mobile-menu-overlay" id="rightMenuOverlay"></div>
+  <div class="mobile-menu right-menu" id="rightMobileMenu">
+    <div class="mobile-menu-header">
+      <h3>操作</h3>
+      <button class="close-btn" id="closeRightMenuBtn">✕</button>
+    </div>
+    <div class="mobile-action-list" style="padding:10px;">
+      <button class="btn-sm" id="mobileClearHeaderBtn" style="display:none; width:100%; margin-bottom:10px; padding:12px; border:1px solid var(--border); background:var(--surface);">清空会话</button>
+      <button class="btn-sm" id="mobileNewTempBtn" style="display:none; width:100%; margin-bottom:10px; padding:12px; background:linear-gradient(135deg, var(--primary), var(--secondary)); color:white; border:none;">+ 临时会话</button>
+      <button class="btn-sm danger" id="mobileDeleteTempBtn" style="display:none; width:100%; margin-bottom:10px; padding:12px; border:1px solid var(--error); color:var(--error); background:var(--surface);">删除会话</button>
+    </div>
+  </div>
+  
+  <!-- 聊天区 -->
+  <div class="main-content">
+    <div class="chat-header">
+      <span class="agent-name" id="headerAgentName">选择一个 Agent 开始聊天</span>
+      <div id="headerButtons" style="display: none; gap: 8px; align-items: center;">
+        <button class="btn-sm" id="clearChatHeaderBtn" style="padding: 6px 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer;">清空会话</button>
+        <button class="btn-sm" id="newTempSessionBtn" style="padding: 6px 12px; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border: none;">+ 临时会话</button>
+        <button class="btn-sm" id="deleteTempSessionBtn" style="display: none; padding: 6px 12px; border: 1px solid var(--error); color: var(--error); background: var(--surface); cursor: pointer;">删除会话</button>
+      </div>
+    </div>
+    <div class="messages-container" id="messagesContainer">
+      <div class="empty-state">
+        <div class="icon">🤖</div>
+        <p>选择一个 Agent 开始聊天</p>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrapper">
+        <div class="selected-file" id="selectedFile">
+          <span>📎</span>
+          <span id="fileName"></span>
+          <span class="remove" id="removeFile">✕</span>
+        </div>
+        <textarea id="messageInput" placeholder="选择 Agent 后输入消息..." rows="1" disabled></textarea>
+      </div>
+      <div class="action-btns">
+        <button class="icon-btn" id="uploadBtn" title="上传文件" disabled>📎</button>
+        <button class="icon-btn send" id="sendBtn" title="发送" disabled>➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" style="display:none" accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.zip,.mp3,.mp4">
+
+<!-- 创建临时会话对话框 -->
+<div id="tempSessionModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); padding:24px; border-radius:12px; width:90%; max-width:400px;">
+    <h3 style="margin-bottom:16px;">新建临时会话</h3>
+    <div class="form-group">
+      <input type="text" id="tempSessionName" placeholder="输入临时会话名称" style="width:100%; padding:12px; border:2px solid var(--border); border-radius:8px;">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-primary" id="confirmTempSessionBtn" style="flex:1;">创建</button>
+      <button class="btn" id="cancelTempSessionBtn" style="flex:1; background:var(--bg); border:1px solid var(--border);">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 状态 =====
+let token = localStorage.getItem('token');
+let username = localStorage.getItem('username');
+let userId = localStorage.getItem('userId');
+let isAdmin = localStorage.getItem('isAdmin') === 'true';
+let currentAgent = null;
+let currentAgentName = '';
+let currentTempSession = null;  // 当前临时会话ID
+let currentTempSessionName = '';  // 当前临时会话名称
+let selectedFile = null;
+let tempSessions = {};  // 缓存每个Agent的临时会话: { agentId: [sessions] }
+
+// DOM
+const authContainer = document.getElementById('authContainer');
+const appContainer = document.getElementById('appContainer');
+const authError = document.getElementById('authError');
+const agentList = document.getElementById('agentList');
+const mobileAgentList = document.getElementById('mobileAgentList');
+const messagesContainer = document.getElementById('messagesContainer');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const selectedFileEl = document.getElementById('selectedFile');
+const fileNameEl = document.getElementById('fileName');
+const rightMenuBtn = document.getElementById('rightMenuBtn');
+const rightMenuOverlay = document.getElementById('rightMenuOverlay');
+const rightMobileMenu = document.getElementById('rightMobileMenu');
+const closeRightMenuBtn = document.getElementById('closeRightMenuBtn');
+const mobileDisplayUsername = document.getElementById('mobileDisplayUsername');
+const mobileClearHeaderBtn = document.getElementById('mobileClearHeaderBtn');
+const mobileNewTempBtn = document.getElementById('mobileNewTempBtn');
+const mobileDeleteTempBtn = document.getElementById('mobileDeleteTempBtn');
+const headerButtons = document.getElementById('headerButtons');
+const clearChatHeaderBtn = document.getElementById('clearChatHeaderBtn');
+const newTempSessionBtn = document.getElementById('newTempSessionBtn');
+const deleteTempSessionBtn = document.getElementById('deleteTempSessionBtn');
+const tempSessionModal = document.getElementById('tempSessionModal');
+const tempSessionNameInput = document.getElementById('tempSessionName');
+const confirmTempSessionBtn = document.getElementById('confirmTempSessionBtn');
+const cancelTempSessionBtn = document.getElementById('cancelTempSessionBtn');
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', () => {
+  if (token) verifyToken();
+  setupEventListeners();
+});
+
+async function verifyToken() {
+  try {
+    const res = await fetch('/api/auth/verify', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.valid) {
+      username = data.user.username;
+      userId = data.user.id;
+      isAdmin = data.user.isAdmin;
+      showApp();
+    } else {
+      logout();
+    }
+  } catch {
+    logout();
+  }
+}
+
+function setupEventListeners() {
+  document.getElementById('loginForm').addEventListener('submit', handleLogin);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('mobileLogoutBtn').addEventListener('click', logout);
+  document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
+  document.getElementById('closeMenuBtn').addEventListener('click', closeMobileMenu);
+  document.getElementById('menuOverlay').addEventListener('click', closeMobileMenu);
+  // 右侧菜单
+  rightMenuBtn.addEventListener('click', openRightMenu);
+  closeRightMenuBtn.addEventListener('click', closeRightMenu);
+  rightMenuOverlay.addEventListener('click', closeRightMenu);
+  mobileClearHeaderBtn.addEventListener('click', clearCurrentChat);
+  mobileNewTempBtn.addEventListener('click', openTempSessionModal);
+  mobileDeleteTempBtn.addEventListener('click', () => {
+    if (currentTempSession) deleteTempSession(currentTempSession, currentAgent);
+  });
+  sendBtn.addEventListener('click', sendMessage);
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleFileSelect);
+  document.getElementById('removeFile').addEventListener('click', clearSelectedFile);
+
+  clearChatHeaderBtn.addEventListener('click', clearCurrentChat);
+  deleteTempSessionBtn.addEventListener('click', () => {
+    if (currentTempSession) deleteTempSession(currentTempSession, currentAgent);
+  });
+  
+  // 临时会话
+  newTempSessionBtn.addEventListener('click', openTempSessionModal);
+  confirmTempSessionBtn.addEventListener('click', createTempSession);
+  cancelTempSessionBtn.addEventListener('click', closeTempSessionModal);
+  tempSessionModal.addEventListener('click', (e) => { if (e.target === tempSessionModal) closeTempSessionModal(); });
+  tempSessionNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') createTempSession(); });
+  
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+  });
+}
+
+function showError(el, msg) {
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+// ===== 登录 =====
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+  
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('loginUsername').value,
+        password: document.getElementById('loginPassword').value
+      })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      token = data.token;
+      username = data.user.username;
+      userId = data.user.id;
+      isAdmin = data.user.isAdmin;
+      localStorage.setItem('token', token);
+      localStorage.setItem('username', username);
+      localStorage.setItem('userId', userId);
+      localStorage.setItem('isAdmin', isAdmin ? 'true' : 'false');
+      showApp();
+    } else {
+      showError(authError, data.error);
+    }
+  } catch {
+    showError(authError, '网络错误');
+  }
+  
+  btn.disabled = false;
+  btn.textContent = '登录';
+}
+
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  localStorage.removeItem('userId');
+  localStorage.removeItem('isAdmin');
+  token = null;
+  username = null;
+  userId = null;
+  currentAgent = null;
+  currentTempSession = null;
+  currentTempSessionName = '';
+  tempSessions = {};
+  selectedFile = null;
+  authContainer.style.display = 'flex';
+  appContainer.classList.remove('active');
+}
+
+function showApp() {
+  authContainer.style.display = 'none';
+  appContainer.classList.add('active');
+  document.getElementById('displayUsername').textContent = username;
+  mobileDisplayUsername.textContent = username;
+  loadAgents();
+}
+
+// ===== Agents =====
+async function loadAgents() {
+  try {
+    const res = await fetch('/api/agents', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    renderAgentList(data.agents || []);
+  } catch (err) {
+    console.error('Load agents error:', err);
+  }
+}
+
+function renderAgentList(agents) {
+  const html = agents.map(a => `
+    <div class="agent-item" data-id="${a.id}" data-name="${a.name}" onclick="handleAgentClick(event, '${a.id}', '${a.name}')">
+      <div class="name">${a.name} <button class="agent-expand-btn" onclick="event.stopPropagation(); toggleTempSessions('${a.id}')">▼ 临时</button></div>
+      <div class="desc">${a.description || ''}</div>
+      <div class="temp-sessions" data-agent-id="${a.id}" style="display:none; margin-top:8px;"></div>
+    </div>
+  `).join('');
+  
+  agentList.innerHTML = html;
+  mobileAgentList.innerHTML = html;
+}
+
+function handleAgentClick(e, agentId, agentName) {
+  if (!e.target.classList.contains('agent-expand-btn') && !e.target.closest('.temp-session-item')) {
+    selectAgent(agentId, agentName);
+  }
+}
+
+// 切换临时会话列表显示
+function toggleTempSessions(agentId) {
+  // 查找所有匹配的容器（PC版和手机版），同时更新
+  const containers = document.querySelectorAll(`.agent-item[data-id="${agentId}"] .temp-sessions`);
+  if (containers.length === 0) return;
+  
+  containers.forEach(container => {
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
+    }
+  });
+  
+  loadTempSessions(agentId);
+}
+
+// 更新临时会话数量按钮
+function updateTempButtonCount(agentId) {
+  // 更新所有按钮（PC版和手机版）
+  const btns = document.querySelectorAll(`.agent-expand-btn[data-agent="${agentId}"]`);
+  const count = tempSessions[agentId]?.length || 0;
+  btns.forEach(btn => btn.textContent = `▼ 临时(${count})`);
+}
+
+// 加载临时会话
+async function loadTempSessions(agentId) {
+  // 如果已加载，直接渲染所有容器
+  if (tempSessions[agentId]) {
+    renderAllTempContainers(agentId);
+    updateTempButtonCount(agentId);
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/chat/temp/${agentId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    tempSessions[agentId] = data.sessions || [];
+    renderAllTempContainers(agentId);
+    updateTempButtonCount(agentId);
+  } catch (err) {
+    console.error('Load temp sessions error:', err);
+  }
+}
+
+// 渲染所有临时会话容器（PC版和手机版）
+function renderAllTempContainers(agentId) {
+  const containers = document.querySelectorAll(`.agent-item[data-id="${agentId}"] .temp-sessions`);
+  containers.forEach(container => renderTempSessions(container, agentId));
+  updateTempButtonCount(agentId);
+}
+
+// 渲染临时会话列表
+function renderTempSessions(container, agentId) {
+  const sessions = tempSessions[agentId] || [];
+  
+  if (sessions.length === 0) {
+    container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-light); padding:8px 0;">暂无临时会话</div>';
+    return;
+  }
+  
+  container.innerHTML = sessions.map(s => `
+    <div class="temp-session-item ${currentTempSession === s.id ? 'active' : ''}" data-session-id="${s.id}" data-session-name="${s.name}">
+      <span class="temp-name">📝 ${s.name}</span>
+      <span class="temp-delete" data-session="${s.id}">删除</span>
+    </div>
+  `).join('');
+  
+  // 绑定点击临时会话
+  container.querySelectorAll('.temp-session-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('temp-delete')) {
+        e.stopPropagation();
+        deleteTempSession(e.target.dataset.session, agentId);
+      } else {
+        selectTempSession(el.dataset.sessionId, el.dataset.sessionName, agentId);
+      }
+    });
+  });
+}
+
+// 选择临时会话
+async function selectTempSession(sessionId, sessionName, agentId) {
+  currentTempSession = sessionId;
+  currentTempSessionName = sessionName;
+  currentAgent = agentId;
+  
+  // 更新临时会话列表的选中状态
+  document.querySelectorAll('.temp-session-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.sessionId === sessionId);
+  });
+  
+  // 更新 Agent 列表选中状态
+  document.querySelectorAll('.agent-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === agentId);
+  });
+  
+  const agentName = document.querySelector(`.agent-item[data-id="${agentId}"] .name`).textContent.split('▼')[0].trim();
+  // 显示为：临时会话名称(Agent名称)
+  const displayName = `${sessionName}(${agentName})`;
+  document.getElementById('headerAgentName').textContent = displayName;
+  document.getElementById('mobileAgentName').textContent = displayName;
+  
+  // 临时会话模式：显示清空会话和删除会话按钮
+  headerButtons.style.display = 'flex';
+  clearChatHeaderBtn.style.display = 'inline';
+  newTempSessionBtn.style.display = 'none';
+  deleteTempSessionBtn.style.display = 'inline';
+  
+  // 启用输入
+  messageInput.disabled = false;
+  messageInput.placeholder = '输入消息... (Enter发送，Shift+Enter换行)';
+  sendBtn.disabled = false;
+  uploadBtn.disabled = false;
+  
+  closeMobileMenu();
+  
+  // 加载历史
+  await loadTempHistory(sessionId);
+  
+  // 更新手机操作菜单按钮
+  updateMobileActionButtons();
+}
+
+// 加载临时会话历史
+async function loadTempHistory(sessionId) {
+  try {
+    const res = await fetch(`/api/chat/temp/history/${sessionId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    renderMessages(data.messages || []);
+  } catch (err) {
+    console.error('Load temp history error:', err);
+  }
+}
+
+// 删除临时会话
+async function deleteTempSession(sessionId, agentId) {
+  if (!confirm('确定要删除这个临时会话吗？')) return;
+  
+  try {
+    const res = await fetch(`/api/chat/temp/${sessionId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.success) {
+      // 清除缓存
+      tempSessions[agentId] = tempSessions[agentId].filter(s => s.id !== sessionId);
+      
+      // 更新按钮数量
+      updateTempButtonCount(agentId);
+      
+      // 刷新临时会话列表和按钮数量
+      renderAllTempContainers(agentId);
+      
+      // 如果删除的是当前会话，切换回主会话
+      if (currentTempSession === sessionId) {
+        currentTempSession = null;
+        currentTempSessionName = '';
+        await selectAgent(agentId, currentAgentName);
+      }
+    }
+  } catch (err) {
+    alert('删除失败: ' + err.message);
+  }
+}
+
+// 临时会话对话框
+function openTempSessionModal() {
+  tempSessionModal.style.display = 'flex';
+  tempSessionNameInput.value = '';
+  tempSessionNameInput.focus();
+}
+
+function closeTempSessionModal() {
+  tempSessionModal.style.display = 'none';
+}
+
+async function createTempSession() {
+  const name = tempSessionNameInput.value.trim();
+  if (!name) {
+    tempSessionNameInput.focus();
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/chat/temp/${currentAgent}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      // 添加到缓存
+      if (!tempSessions[currentAgent]) tempSessions[currentAgent] = [];
+      tempSessions[currentAgent].push(data.session);
+      
+      // 刷新列表
+      renderAllTempContainers(currentAgent);
+      // 显示临时会话列表
+      const containers = document.querySelectorAll(`.agent-item[data-id="${currentAgent}"] .temp-sessions`);
+      containers.forEach(c => c.style.display = 'block');
+      
+      // 更新按钮数量
+      updateTempButtonCount(currentAgent);
+      
+      closeTempSessionModal();
+      closeRightMenu();  // 关闭手机右侧菜单
+      
+      // 自动切换到新创建的临时会话
+      await selectTempSession(data.session.id, data.session.name, currentAgent);
+    } else {
+      alert('创建失败: ' + data.error);
+    }
+  } catch (err) {
+    alert('创建失败: ' + err.message);
+  }
+}
+
+async function selectAgent(id, name) {
+  currentAgent = id;
+  currentAgentName = name;
+  currentTempSession = null;  // 清除临时会话
+  currentTempSessionName = '';
+  
+  // 更新UI
+  document.querySelectorAll('.agent-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+  document.querySelectorAll('.temp-session-item').forEach(el => el.classList.remove('active'));
+  
+  document.getElementById('headerAgentName').textContent = name;
+  document.getElementById('mobileAgentName').textContent = name;
+  
+  // 主会话模式：显示清空会话和+临时会话按钮
+  headerButtons.style.display = 'flex';
+  clearChatHeaderBtn.style.display = 'inline';
+  newTempSessionBtn.style.display = 'inline';
+  deleteTempSessionBtn.style.display = 'none';
+  
+  // 启用输入
+  messageInput.disabled = false;
+  messageInput.placeholder = '输入消息... (Enter发送，Shift+Enter换行)';
+  sendBtn.disabled = false;
+  uploadBtn.disabled = false;
+  
+  closeMobileMenu();
+  
+  // 加载历史
+  await loadHistory();
+  
+  // 更新手机操作菜单按钮
+  updateMobileActionButtons();
+}
+
+async function loadHistory() {
+  if (!currentAgent) return;
+  
+  try {
+    const res = await fetch(`/api/chat/history/${currentAgent}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    renderMessages(data.messages || []);
+  } catch (err) {
+    console.error('Load history error:', err);
+  }
+}
+
+function renderMessages(messages) {
+  if (messages.length === 0) {
+    messagesContainer.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">💬</div>
+        <p>开始和 ${currentAgentName} 聊天吧</p>
+      </div>
+    `;
+    return;
+  }
+  
+  messagesContainer.innerHTML = messages.map(m => {
+    let content = m.content || '';
+    let fileInfo = '';
+    
+    if (m.file) {
+      fileInfo = `<div class="file-info">📎 <a href="${m.file.url}" target="_blank">${m.file.originalName}</a></div>`;
+    }
+    
+    // assistant消息用markdown渲染
+    if (m.role === 'assistant') {
+      content = marked.parse(content);
+    }
+    
+    return `
+      <div class="message ${m.role}">
+        ${fileInfo}
+        <div class="content">${content}</div>
+        <div class="time">${formatTime(m.timestamp)}</div>
+      </div>
+    `;
+  }).join('');
+  
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+// ===== 文件 =====
+async function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      selectedFile = data.file;
+      fileNameEl.textContent = data.file.originalName;
+      selectedFileEl.classList.add('active');
+    } else {
+      alert('上传失败: ' + data.error);
+    }
+  } catch (err) {
+    alert('上传错误: ' + err.message);
+  }
+  
+  fileInput.value = '';
+}
+
+function clearSelectedFile() {
+  selectedFile = null;
+  selectedFileEl.classList.remove('active');
+}
+
+// ===== 发送消息 =====
+async function sendMessage() {
+  const message = messageInput.value.trim();
+  
+  if (!message && !selectedFile) return;
+  if (!currentAgent) return;
+  
+  sendBtn.disabled = true;
+  uploadBtn.disabled = true;
+  messageInput.disabled = true;
+  
+  // 显示用户消息
+  let userContent = message || '(发送文件)';
+  let fileToSend = selectedFile ? {
+    originalName: selectedFile.originalName,
+    url: selectedFile.url,
+    mimetype: selectedFile.mimetype,
+    size: selectedFile.size,
+    absolutePath: selectedFile.absolutePath
+  } : null;
+  
+  if (selectedFile) {
+    addMessage('user', userContent, selectedFile);
+  } else {
+    addMessage('user', message);
+  }
+  
+  messageInput.value = '';
+  messageInput.style.height = 'auto';
+  clearSelectedFile();
+  
+  // 创建assistant消息占位
+  const assistantEl = document.createElement('div');
+  assistantEl.className = 'message assistant';
+  assistantEl.innerHTML = '<div class="content">...</div>';
+  messagesContainer.appendChild(assistantEl);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  const contentEl = assistantEl.querySelector('.content');
+  
+  try {
+    const requestBody = {
+      message: message,
+      agentId: currentAgent,
+      file: fileToSend
+    };
+    
+    // 如果有临时会话，添加临时会话ID
+    if (currentTempSession) {
+      requestBody.tempSessionId = currentTempSession;
+    }
+    
+    const res = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullContent = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') {
+            contentEl.innerHTML = marked.parse(fullContent);
+            assistantEl.innerHTML += `<div class="time">${formatTime(new Date().toISOString())}</div>`;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            sendBtn.disabled = false;
+            uploadBtn.disabled = false;
+            messageInput.disabled = false;
+            messageInput.focus();
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            // 支持 OpenAI 格式和简化格式
+            const content = parsed.choices?.[0]?.delta?.content || parsed.content || '';
+            if (content) {
+              fullContent += content;
+              contentEl.innerHTML = marked.parse(fullContent);
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            if (parsed.error) {
+              contentEl.innerHTML = '❌ 错误: ' + parsed.error;
+            }
+          } catch {}
+        }
+      }
+    }
+    
+    contentEl.innerHTML = marked.parse(fullContent);
+    
+  } catch (err) {
+    contentEl.innerHTML = '❌ 网络错误: ' + err.message;
+  }
+  
+  sendBtn.disabled = false;
+  uploadBtn.disabled = false;
+  messageInput.disabled = false;
+}
+
+function addMessage(role, content, file = null) {
+  // 清除空状态
+  const empty = messagesContainer.querySelector('.empty-state');
+  if (empty) empty.remove();
+  
+  let fileInfo = '';
+  if (file) {
+    fileInfo = `<div class="file-info">📎 <a href="${file.url}" target="_blank">${file.originalName}</a></div>`;
+  }
+  
+  const el = document.createElement('div');
+  el.className = `message ${role}`;
+  el.innerHTML = `
+    ${fileInfo}
+    <div class="content">${content}</div>
+    <div class="time">${formatTime(new Date().toISOString())}</div>
+  `;
+  messagesContainer.appendChild(el);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ===== 清空会话 =====
+async function clearCurrentChat() {
+  if (!currentAgent) return;
+  
+  const sessionType = currentTempSession ? currentTempSessionName : '主会话';
+  const agentName = currentAgentName + (currentTempSession ? ` (${currentTempSessionName})` : '');
+  
+  if (!confirm('确定要清空与 ' + agentName + ' 的聊天记录吗？')) return;
+  
+  try {
+    if (currentTempSession) {
+      // 清空临时会话 - 使用删除后重新创建的方式
+      const res = await fetch(`/api/chat/temp/${currentTempSession}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        // 重新创建空会话
+        const createRes = await fetch(`/api/chat/temp/${currentAgent}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ name: currentTempSessionName })
+        });
+        const createData = await createRes.json();
+        if (createData.success) {
+          // 更新缓存
+          tempSessions[currentAgent] = tempSessions[currentAgent].filter(s => s.id !== currentTempSession);
+          tempSessions[currentAgent].push(createData.session);
+          currentTempSession = createData.session.id;
+          
+          // 刷新列表
+          renderAllTempContainers(currentAgent);
+          
+          messagesContainer.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">💬</div>
+              <p>会话已清空，重新开始聊天吧</p>
+            </div>
+          `;
+        }
+      }
+    } else {
+      // 清空主会话
+      const res = await fetch(`/api/chat/clear/${currentAgent}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        messagesContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">💬</div>
+            <p>会话已清空，重新开始聊天吧</p>
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    alert('清空失败: ' + err.message);
+  }
+  
+  closeMobileMenu();
+}
+
+// ===== 手机菜单 =====
+function openMobileMenu() {
+  mobileMenu.classList.add('active');
+  menuOverlay.classList.add('active');
+}
+
+function closeMobileMenu() {
+  mobileMenu.classList.remove('active');
+  menuOverlay.classList.remove('active');
+}
+
+function openRightMenu() {
+  updateMobileActionButtons();
+  rightMobileMenu.classList.add('active');
+  rightMenuOverlay.classList.add('active');
+}
+
+function closeRightMenu() {
+  rightMobileMenu.classList.remove('active');
+  rightMenuOverlay.classList.remove('active');
+}
+
+// 更新手机右侧菜单按钮显示
+function updateMobileActionButtons() {
+  if (!currentAgent) {
+    mobileClearHeaderBtn.style.display = 'none';
+    mobileNewTempBtn.style.display = 'none';
+    mobileDeleteTempBtn.style.display = 'none';
+    return;
+  }
+  
+  mobileClearHeaderBtn.style.display = 'block';
+  
+  if (currentTempSession) {
+    // 临时会话模式
+    mobileNewTempBtn.style.display = 'none';
+    mobileDeleteTempBtn.style.display = 'block';
+  } else {
+    // 主会话模式
+    mobileNewTempBtn.style.display = 'block';
+    mobileDeleteTempBtn.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>
