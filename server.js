@@ -357,7 +357,9 @@ app.post('/api/chat/send', authMiddleware, async (req, res) => {
   messages.push({ role: 'user', content: userContent, timestamp: new Date().toISOString(), file: file || null });
   
   const effectiveAgentId = isTempSession ? sessions.find(s => s.id === tempSessionId).agentId : agentId;
-  const sessionKey = `agent:${effectiveAgentId}:openai:webchat:${req.user.username}${isTempSession ? ':temp:' + tempSessionId : ''}`;
+  // 主会话使用固定的 session key，临时会话使用 tempSessionId
+  const chatSessionId = isTempSession ? tempSessionId : agentId;
+  const sessionKey = `agent:${effectiveAgentId}:openai:webchat:${req.user.username}:chat:${chatSessionId}`;
   let requestMessage = message || '';
   if (file?.absolutePath) requestMessage = `[用户上传${file.mimetype?.startsWith('image/') ? '图片' : '文件'}: ${file.originalName}]\n文件路径: ${file.absolutePath}\n\n${message || '请查看'}`;
   
@@ -399,71 +401,85 @@ app.post('/api/chat/send', authMiddleware, async (req, res) => {
   };
   eventHandlers.set('chat', [chatHandler]);
   
+  // 监听 agent lifecycle 事件来检测 run 完成
+  let runEnded = false;
+  let currentRunId = null;
+  const agentHandler = (payload) => {
+    // 忽略不相关的 run
+    if (currentRunId && payload?.runId !== currentRunId) return;
+    
+    if (payload?.stream === 'lifecycle' && payload?.data?.phase === 'end') {
+      console.log('[Chat] Run lifecycle end detected:', payload.runId);
+      runEnded = true;
+    }
+    // 也监听 stream:done 作为备用
+    if (payload?.stream === 'done') {
+      console.log('[Chat] Stream done detected:', payload.runId);
+      runEnded = true;
+    }
+  };
+  eventHandlers.set('agent', [agentHandler]);
+  
   try {
     const result = await gatewayRequest('chat.send', { sessionKey, message: requestMessage, idempotencyKey: uuidv4() }, 180000);
     console.log('[Chat] Result:', result?.status);
     
     if (result?.status === 'started' || result?.status === 'in_flight') {
-      const runId = result.runId;
-      console.log('[Chat] Run started:', runId);
+      currentRunId = result.runId;
+      console.log('[Chat] Run started:', currentRunId);
       
-      // 等待完成
+      // 等待 agent lifecycle end 事件
       const startTime = Date.now();
       const maxWait = 180000; // 3 minutes
       let checkCount = 0;
       
-      while (Date.now() - startTime < maxWait && !ended) {
+      while (Date.now() - startTime < maxWait && !ended && !runEnded) {
         await new Promise(r => setTimeout(r, 1000));
         checkCount++;
         
-        // 检查运行状态
+        // 每 5 秒检查一次 runEnded 状态（由 agentHandler 设置）
+        if (checkCount % 5 === 0) {
+          console.log(`[Chat] Check ${checkCount}: runEnded=${runEnded}`);
+        }
+      }
+      
+      // run 结束后获取历史
+      if (runEnded || ended) {
+        await new Promise(r => setTimeout(r, 1500)); // 等待历史写入
         try {
-          const sessions = await gatewayRequest('sessions.list', { limit: 10, activeMinutes: 5 }, 5000);
-          const session = sessions?.sessions?.find(s => s.key === sessionKey);
-          console.log(`[Chat] Check ${checkCount}: Session status:`, session?.status);
+          const history = await gatewayRequest('chat.history', { sessionKey, limit: 10 }, 10000);
+          console.log('[Chat] History response:', JSON.stringify(history).slice(0, 800));
           
-          if (session && session.status !== 'running') {
-            // 运行完成，获取历史
-            await new Promise(r => setTimeout(r, 1500)); // 等待历史写入
-            try {
-              const history = await gatewayRequest('chat.history', { sessionKey, limit: 10 }, 10000);
-              console.log('[Chat] History response:', JSON.stringify(history).slice(0, 800));
+          if (history?.messages && Array.isArray(history.messages)) {
+            console.log('[Chat] Messages count:', history.messages.length);
+            
+            // 找到最后一条 assistant 消息
+            for (let i = history.messages.length - 1; i >= 0; i--) {
+              const msg = history.messages[i];
               
-              if (history?.messages && Array.isArray(history.messages)) {
-                console.log('[Chat] Messages count:', history.messages.length);
+              if (msg.role === 'assistant') {
+                console.log('[Chat] Found assistant message:', JSON.stringify(msg).slice(0, 300));
                 
-                // 找到最后一条 assistant 消息
-                for (let i = history.messages.length - 1; i >= 0; i--) {
-                  const msg = history.messages[i];
-                  
-                  if (msg.role === 'assistant') {
-                    console.log('[Chat] Found assistant message:', JSON.stringify(msg).slice(0, 300));
-                    
-                    // 内容可能是字符串或数组
-                    if (typeof msg.content === 'string') {
-                      fullContent = msg.content;
-                      console.log('[Chat] String content:', fullContent?.slice(0, 100));
-                    } else if (Array.isArray(msg.content)) {
-                      // 提取 text 类型
-                      for (const part of msg.content) {
-                        if (part.type === 'text' && part.text) {
-                          fullContent = part.text;
-                          console.log('[Chat] Array text content:', fullContent?.slice(0, 100));
-                          break;
-                        }
-                      }
+                // 内容可能是字符串或数组
+                if (typeof msg.content === 'string') {
+                  fullContent = msg.content;
+                  console.log('[Chat] String content:', fullContent?.slice(0, 100));
+                } else if (Array.isArray(msg.content)) {
+                  // 提取 text 类型
+                  for (const part of msg.content) {
+                    if (part.type === 'text' && part.text) {
+                      fullContent = part.text;
+                      console.log('[Chat] Array text content:', fullContent?.slice(0, 100));
+                      break;
                     }
-                    break;
                   }
                 }
+                break;
               }
-            } catch (e) {
-              console.error('[Chat] History fetch error:', e.message);
             }
-            break;
           }
         } catch (e) {
-          console.error('[Chat] Status check error:', e.message);
+          console.error('[Chat] History fetch error:', e.message);
         }
       }
       
@@ -479,6 +495,7 @@ app.post('/api/chat/send', authMiddleware, async (req, res) => {
     finish(null, err.message);
   } finally {
     eventHandlers.delete('chat');
+    eventHandlers.delete('agent');
   }
 });
 
