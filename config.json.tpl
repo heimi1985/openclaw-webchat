@@ -7,7 +7,7 @@
   },
   "openclaw": {
     "apiUrl": "https://127.0.0.1:18789/v1/chat/completions",
-    "apiKey": "openclaw gateway.auth.token"
+    "apiKey": "f0ec6588da27358b51345bf9331607e53be5e7147c2ab173"
   },
   "jwtSecret": "openclaw-webchat-jwt-secret-2024",
   "agents": [
@@ -21,7 +21,7 @@
     {
       "username": "admin",
       "password": "admin123",
-      "allowedAgents": ["main"],
+      "allowedAgents": ["main","it","oc","gp"],
       "isAdmin": true
     }
   ]
